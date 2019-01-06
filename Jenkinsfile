@@ -15,9 +15,11 @@ try
   }
 
   stage('Build Maven'){
-    withMaven(maven: 'apache-maven3.6'){
-     sh "mvn clean package"
-    } 
+    node('master'){
+      withMaven(maven: 'apache-maven3.6'){
+       sh "mvn clean package"
+      } 
+    }
   }
 
   stage('Build Docker Image') {
