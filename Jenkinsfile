@@ -41,7 +41,7 @@ try
     }
   }
 
-  stage('Deploy on k8s') {
+  stage('Deploy on Dev') {
     node('master'){
         withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/config","IMAGE=${ACCOUNT}.dkr.ecr.us-east-1.amazonaws.com/${ECR_REPO_NAME}:${IMAGETAG}"]){
         sh "sed -i 's|IMAGE|${IMAGE}|g' k8s/deployment.yaml"
@@ -58,6 +58,35 @@ try
          ).trim()
         CURRENT= sh (
           script: "kubectl get deployment/$DEPLOYMENT | awk '{print \$3}' | grep -v CURRENT",
+          returnStdout: true
+         ).trim()
+        if (DESIRED.equals(CURRENT)) {
+          currentBuild.result = "SUCCESS"
+          return
+        } else {
+          error("Deployment Unsuccessful.")
+        }
+      }
+    }
+  }
+
+  stage('Deploy on Prod') {
+    node('master'){
+        withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/config","IMAGE=${ACCOUNT}.dkr.ecr.us-east-1.amazonaws.com/${ECR_REPO_NAME}:${IMAGETAG}"]){
+        sh "sed -i 's|IMAGE|${IMAGE}|g' k8s/deployment.yaml"
+        sh "kubectl apply -f k8s -n prod"
+        DEPLOYMENT = sh (
+          script: 'cat k8s/deployment.yaml | yq -r .metadata.name',
+          returnStdout: true
+        ).trim()
+        echo "Creating k8s resources..."
+        sleep 60
+        DESIRED= sh (
+          script: "kubectl get deployment/$DEPLOYMENT -n prod | awk '{print \$2}' | grep -v DESIRED",
+          returnStdout: true
+         ).trim()
+        CURRENT= sh (
+          script: "kubectl get deployment/$DEPLOYMENT -n prod | awk '{print \$3}' | grep -v CURRENT",
           returnStdout: true
          ).trim()
         if (DESIRED.equals(CURRENT)) {
