@@ -1,0 +1,18 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: taxicab
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: java
+        version: v1
+    spec:
+      containers:
+      - name: taxicab
+        image: IMAGE
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080

@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: taxicab-svc
+  labels:
+    app: java
+spec:
+  ports:
+  - port: 8080
+    name: http
+  selector:
+    version: v1
