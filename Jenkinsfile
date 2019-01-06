@@ -22,7 +22,7 @@ try
 
   stage('Build Docker Image') {
     node('master'){
-      sh "\$(aws ecr get-login --no-include-email --region ap-south-1)"
+      sh "\$(aws ecr get-login --no-include-email --region us-east-1)"
       GIT_COMMIT_ID = sh (
         script: 'git log -1 --pretty=%H',
         returnStdout: true
