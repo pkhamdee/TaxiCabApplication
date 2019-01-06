@@ -2,6 +2,7 @@
 properties([
     parameters([
         string(defaultValue: "master", description: 'Which Git Branch to clone?', name: 'GIT_BRANCH'),
+        string(defaultValue: "1234567", description: 'AWS Account Number?', name: 'ACCOUNT'),
         string(defaultValue: "java-app", description: 'AWS ECR Repository where built docker images will be pushed.', name: 'ECR_REPO_NAME')
 ])
 ])
@@ -35,14 +36,14 @@ try
       ).trim()
       echo "Git commit id: ${GIT_COMMIT_ID}"
       IMAGETAG="${GIT_COMMIT_ID}-${TIMESTAMP}"
-      sh "docker build -t 645385727312.dkr.ecr.ap-south-1.amazonaws.com/${ECR_REPO_NAME}:${IMAGETAG} ."
-      sh "docker push 645385727312.dkr.ecr.ap-south-1.amazonaws.com/${ECR_REPO_NAME}:${IMAGETAG}"
+        sh "docker build -t ${ACCOUNT}.dkr.ecr.us-east-1.amazonaws.com/${ECR_REPO_NAME}:${IMAGETAG} ."
+      sh "docker push ${ACCOUNT}.dkr.ecr.us-east-1.amazonaws.com/${ECR_REPO_NAME}:${IMAGETAG}"
     }
   }
 
   stage('Deploy on k8s') {
     node('master'){
-      withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/config","IMAGE=645385727312.dkr.ecr.ap-south-1.amazonaws.com/${ECR_REPO_NAME}:${IMAGETAG}"]){
+        withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/config","IMAGE=${ACCOUNT}.dkr.ecr.ua-east-1.amazonaws.com/${ECR_REPO_NAME}:${IMAGETAG}"]){
         sh "sed -i 's|IMAGE|${IMAGE}|g' k8s/deployment.yaml"
         sh "kubectl apply -f k8s"
         DEPLOYMENT = sh (
