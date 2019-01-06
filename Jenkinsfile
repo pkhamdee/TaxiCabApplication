@@ -43,7 +43,7 @@ try
 
   stage('Deploy on k8s') {
     node('master'){
-        withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/config","IMAGE=${ACCOUNT}.dkr.ecr.ua-east-1.amazonaws.com/${ECR_REPO_NAME}:${IMAGETAG}"]){
+        withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/config","IMAGE=${ACCOUNT}.dkr.ecr.us-east-1.amazonaws.com/${ECR_REPO_NAME}:${IMAGETAG}"]){
         sh "sed -i 's|IMAGE|${IMAGE}|g' k8s/deployment.yaml"
         sh "kubectl apply -f k8s"
         DEPLOYMENT = sh (
