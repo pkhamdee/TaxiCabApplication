@@ -9,4 +9,4 @@ spec:
   - port: 8080
     name: http
   selector:
-    version: v1
+    name: taxicab-ENVIRONMENT
