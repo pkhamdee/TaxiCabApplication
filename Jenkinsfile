@@ -77,7 +77,9 @@ catch (err){
 }
 def userInput
 try {
+timeout(time: 60, unit: 'SECONDS') {
 userInput = input message: 'Proceed to Production?', parameters: [booleanParam(defaultValue: false, description: 'Ticking this box will do a deployment on Prod', name: 'Deploy')]
+}
 }catch (err) {
     def user = err.getCauses()[0].getUser()
     echo "Aborted by:\n ${user}"
