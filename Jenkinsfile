@@ -78,11 +78,11 @@ catch (err){
 try {
 node('master'){
     timeout(time: 15, unit: 'SECONDS') {
-        input message: 'Proceed to Production?',
+        input(message: 'Proceed to Production?',
               parameters: [[$class: 'BooleanParameterDefinition',
                             defaultValue: false,
                             description: 'Ticking this box will do a deployment on Prod',
-                            name: 'Deploy']]
+                            name: 'Deploy']])
               echo "Proceeding"
     }
 }
