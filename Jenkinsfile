@@ -75,6 +75,7 @@ catch (err){
   currentBuild.result = "FAILURE"
   throw err
 }
+def userInput
 try {
 userInput = input message: 'Proceed to Production?', parameters: [booleanParam(defaultValue: false, description: 'Ticking this box will do a deployment on Prod', name: 'Deploy')]
 }catch (err) {
