@@ -75,3 +75,19 @@ catch (err){
   currentBuild.result = "FAILURE"
   throw err
 }
+try {
+node('master'){
+    timeout(time: 15, unit: 'SECONDS') {
+        input message: 'Proceed to Production?',
+              parameters: [[$class: 'BooleanParameterDefinition',
+                            defaultValue: false,
+                            description: 'Ticking this box will do a deployment on Prod',
+                            name: 'Deploy']]
+              echo "Proceeding"
+    }
+}
+}catch (err) {
+    def user = err.getCauses()[0].getUser()
+    echo "Aborted by:\n ${user}"
+}
+
