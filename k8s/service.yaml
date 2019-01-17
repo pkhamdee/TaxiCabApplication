@@ -9,4 +9,4 @@ spec:
   - port: 8080
     name: http
   selector:
-    app: java
+    version: v1
