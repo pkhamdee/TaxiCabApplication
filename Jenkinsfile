@@ -76,6 +76,8 @@ catch (err){
   throw err
 }
 try {
+  stage('Clone Repo'){
+    node('master'){
     timeout(time: 15, unit: 'SECONDS') {
         input message: 'Proceed to Production?',
               parameters: [[$class: 'BooleanParameterDefinition',
@@ -84,7 +86,8 @@ try {
                             name: 'Deploy']]
               echo "Proceeding"
     }
-} catch (err) {
+} 
+}catch (err) {
     def user = err.getCauses()[0].getUser()
     echo "Aborted by:\n ${user}"
 }
