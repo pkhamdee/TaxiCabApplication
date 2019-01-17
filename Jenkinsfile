@@ -87,6 +87,7 @@ stage('Deploy on Prod') {
     node('master'){
       if (userInput == true) {
           echo "Deploying to Production..."       
+          echo (userInput)
 }
 else {
         echo "this was not successful"
