@@ -76,10 +76,20 @@ catch (err){
   throw err
 }
 try {
-input message: 'Proceed to Production?', parameters: [booleanParam(defaultValue: false, description: 'Ticking this box will do a deployment on Prod', name: 'Deploy')]
-              echo "Proceeding"
+userInput = input message: 'Proceed to Production?', parameters: [booleanParam(defaultValue: false, description: 'Ticking this box will do a deployment on Prod', name: 'Deploy')]
 }catch (err) {
     def user = err.getCauses()[0].getUser()
     echo "Aborted by:\n ${user}"
 }
 
+stage('Deploy on Prod') {
+    node('master'){
+      if (userInput == true) {
+          echo "Deploying to Production..."       
+}
+else {
+        echo "this was not successful"
+        currentBuild.result = 'FAILURE'
+    } 
+}
+}
