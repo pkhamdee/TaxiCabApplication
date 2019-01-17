@@ -76,7 +76,7 @@ catch (err){
   throw err
 }
 try {
-  stage('Clone Repo'){
+  stage('Proceed to Prod'){
     node('master'){
     timeout(time: 15, unit: 'SECONDS') {
         input message: 'Proceed to Production?',
@@ -87,6 +87,7 @@ try {
               echo "Proceeding"
     }
 } 
+}
 }catch (err) {
     def user = err.getCauses()[0].getUser()
     echo "Aborted by:\n ${user}"
