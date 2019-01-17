@@ -92,8 +92,7 @@ stage('Deploy on Prod') {
           echo "Deploying "+userInput
 }
 else {
-        echo "this was not successful"
-        currentBuild.result = 'FAILURE'
+        echo "Aborted Production Deployment..!!"
     } 
 }
 }
