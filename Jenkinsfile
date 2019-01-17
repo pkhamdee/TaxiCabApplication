@@ -116,7 +116,6 @@ stage('Deploy on Prod') {
         }
       }
     }
-}
 else {
         echo "Aborted Production Deployment..!!"
     } 
