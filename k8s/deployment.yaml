@@ -7,7 +7,7 @@ spec:
   template:
     metadata:
       labels:
-        app: java
+        app: taxicab
         version: v1
     spec:
       containers:
