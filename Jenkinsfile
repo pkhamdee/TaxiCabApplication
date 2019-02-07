@@ -74,7 +74,7 @@ try
   stage('Validate Green Env') {
     node('master'){
       GREEN_SVC_NAME = sh (
-        script: "yq .metadata.name k8s/service.yaml | tr -d \"",
+        script: "yq .metadata.name k8s/service.yaml | tr -d '\"'",
         returnStdout: true
       ).trim()
       GREEN_LB = sh (
