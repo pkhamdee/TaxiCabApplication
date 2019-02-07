@@ -25,4 +25,4 @@ spec:
       protocol: "TCP"
   selector:
     app: taxicab
-    version: BUILD_NUMBER
+    version: "BUILD_NUMBER"
