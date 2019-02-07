@@ -90,7 +90,7 @@ try
         ).trim() 
         if (RESPONSE == 200) {
           echo "Application is working fine"
-          sh "kubectl patch svc $GREEN_SVC_NAME -p "{\"spec\":{\"selector\": {\"app\": \"taxicab\", \"version\": \"${BUILD_NUMBER}\"}}}"
+          sh "kubectl patch svc $GREEN_SVC_NAME -p \"{\"spec\":{\"selector\": {\"app\": \"taxicab\", \"version\": \"${BUILD_NUMBER}\"}}}\""
           sh "kubectl delete svc ${GREEN_SVC_NAME}"
         }
         else {
