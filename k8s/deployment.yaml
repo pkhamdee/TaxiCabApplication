@@ -8,7 +8,7 @@ spec:
     metadata:
       labels:
         app: taxicab
-        version: BUILD_NUMBER
+        version: "BUILD_NUMBER"
     spec:
       containers:
       - name: taxicab-ENVIRONMENT-BUILD_NUMBER
