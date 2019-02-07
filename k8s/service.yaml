@@ -1,12 +1,29 @@
 apiVersion: v1
+apiVersion: v1
 kind: Service
 metadata:
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: "arn:aws:acm:us-east-1:ACCOUNT:certificate/078946f1-cd50-4b9e-83b6-fd9ba252f7ad"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "443"
+    service.beta.kubernetes.io/aws-load-balancer-access-log-emit-interval: "5"
+    service.beta.kubernetes.io/aws-load-balancer-access-log-enabled: "true"
+    service.beta.kubernetes.io/aws-load-balancer-access-log-s3-bucket-name: k8sdemo-elb-access-logs
+    service.beta.kubernetes.io/aws-load-balancer-access-log-s3-bucket-prefix: taxicab-ENVIRONMENT-svc
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: http
+    service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags: "Environment=ENVIRONMENT"
+
   name: taxicab-ENVIRONMENT-svc
-  labels:
-    app: java
+  namespace: default
 spec:
+  type: LoadBalancer
   ports:
-  - port: 8080
-    name: http
+    - port: 80
+      targetPort: 8080
+      name: http
+    - name: "https"
+      port: 443
+      targetPort: 8080
+      protocol: "TCP"
   selector:
+    name: taxicab-ENVIRONMENT
     version: v1
