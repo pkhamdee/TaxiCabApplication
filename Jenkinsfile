@@ -54,7 +54,7 @@ try
           returnStdout: true
         ).trim()
         echo "Creating k8s resources..."
-        sleep 120
+        sleep 150
         DESIRED= sh (
           script: "kubectl get deployment/$DEPLOYMENT | awk '{print \$2}' | grep -v DESIRED",
           returnStdout: true
