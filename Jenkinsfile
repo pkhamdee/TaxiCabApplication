@@ -71,6 +71,24 @@ try
       }
     }
   }
+  stage('Validate Green Env') {
+    node('master'){
+      GREEN_SVC_NAME = sh (
+        script: 'yq .metadata.name k8s/service.yaml | tr -d \"',
+        returnStdout: true
+      ).trim()
+      GREEN_LB = sh (
+        script: "kubectl get svc ${GREEN_SVC_NAME} -o jsonpath=\"{.status.loadBalancer.ingress[*].hostname}\"",
+        returnStdout: true
+      ).trim()
+      echo "Green ENV LB: ${GREEN_LB}"
+      RESPONSE = sh (
+        script: "curl http://admin:password@${GREEN_LB}/swagger-ui.html -I",
+        returnStdout: true
+      ).trim() 
+      echo "$RESPONSE"
+    }
+  }
 }
 catch (err){
   currentBuild.result = "FAILURE"
