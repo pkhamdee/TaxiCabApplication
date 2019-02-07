@@ -71,7 +71,7 @@ try
       }
     }
   }
-  stage('Validate Green Env') {
+  stage('Validate Dev Green Env') {
     node('master'){
       withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/dev-config"]){
         GREEN_SVC_NAME = sh (
@@ -84,10 +84,18 @@ try
         ).trim()
         echo "Green ENV LB: ${GREEN_LB}"
         RESPONSE = sh (
-          script: "curl http://admin:password@${GREEN_LB}/swagger-ui.html -I",
+          script: "curl -s -o /dev/null -w \"%{http_code}\" http://admin:password@${GREEN_LB}/swagger-ui.html -I",
           returnStdout: true
         ).trim() 
-        echo "$RESPONSE"
+        if (RESPONSE == 200) {
+          echo "Application is working fine"
+          sh "kubectl patch svc $GREEN_SVC_NAME -p "{\"spec\":{\"selector\": {\"app\": \"taxicab\", \"version\": \"${BUILD_NUMBER}\"}}}"
+          sh "kubectl delete svc ${GREEN_SVC_NAME}"
+        }
+        else {
+          echo "Application didnot pass the test case. Not Working"
+          currentBuild.result = "FAILURE"
+        }
       }
     }
   }
@@ -143,3 +151,31 @@ else {
     } 
 }
 }
+  stage('Validate Prod Green Env') {
+    node('master'){
+      withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/prod-config"]){
+        GREEN_SVC_NAME = sh (
+          script: "yq .metadata.name k8s/service.yaml | tr -d '\"'",
+          returnStdout: true
+        ).trim()
+        GREEN_LB = sh (
+          script: "kubectl get svc ${GREEN_SVC_NAME} -o jsonpath=\"{.status.loadBalancer.ingress[*].hostname}\"",
+          returnStdout: true
+        ).trim()
+        echo "Green ENV LB: ${GREEN_LB}"
+        RESPONSE = sh (
+          script: "curl -s -o /dev/null -w \"%{http_code}\" http://admin:password@${GREEN_LB}/swagger-ui.html -I",
+          returnStdout: true
+        ).trim()
+        if (RESPONSE == 200) {
+          echo "Application is working fine. Patching Service."
+          sh "kubectl patch svc $GREEN_SVC_NAME -p "{\"spec\":{\"selector\": {\"app\": \"taxicab\", \"version\": \"${BUILD_NUMBER}\"}}}"
+          sh "kubectl delete svc ${GREEN_SVC_NAME}"
+        }
+        else {
+          echo "Application didnot pass the test case. Not Working"
+          currentBuild.result = "FAILURE"
+        }
+      }
+    }
+  }

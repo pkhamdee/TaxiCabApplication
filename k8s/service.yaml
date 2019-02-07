@@ -11,7 +11,7 @@ metadata:
     service.beta.kubernetes.io/aws-load-balancer-backend-protocol: http
     service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags: "Environment=ENVIRONMENT"
 
-  name: taxicab-ENVIRONMENT-svc
+  name: taxicab-ENVIRONMENT-svc-BUILD_NUMBER
   namespace: default
 spec:
   type: LoadBalancer
@@ -25,4 +25,4 @@ spec:
       protocol: "TCP"
   selector:
     app: taxicab
-    version: v1
+    version: BUILD_NUMBER
