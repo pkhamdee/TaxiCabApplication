@@ -45,6 +45,7 @@ try
     node('master'){
         withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/dev-config","IMAGE=${ACCOUNT}.dkr.ecr.us-east-1.amazonaws.com/${ECR_REPO_NAME}:${IMAGETAG}"]){
         sh "sed -i 's|IMAGE|${IMAGE}|g' k8s/deployment.yaml"
+        sh "sed -i 's|ACCOUNT|${ACCOUNT}|g' k8s/service.yaml"
         sh "sed -i 's|ENVIRONMENT|dev|g' k8s/*.yaml"
         sh "kubectl apply -f k8s"
         DEPLOYMENT = sh (
@@ -91,6 +92,7 @@ stage('Deploy on Prod') {
           echo "Deploying to Production..."       
        withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/prod-config","IMAGE=${ACCOUNT}.dkr.ecr.us-east-1.amazonaws.com/${ECR_REPO_NAME}:${IMAGETAG}"]){
         sh "sed -i 's|IMAGE|${IMAGE}|g' k8s/deployment.yaml"
+        sh "sed -i 's|ACCOUNT|${ACCOUNT}|g' k8s/service.yaml"
         sh "sed -i 's|dev|prod|g' k8s/*.yaml"
         sh "kubectl apply -f k8s"
         DEPLOYMENT = sh (
