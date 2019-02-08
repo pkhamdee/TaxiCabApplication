@@ -90,11 +90,19 @@ try
           script: "curl -s -o /dev/null -w \"%{http_code}\" http://admin:password@${GREEN_LB}/swagger-ui.html -I",
           returnStdout: true
         ).trim()
-          echo "${RESPONSE}"
+        BLUE_VERSION = sh (
+            script: "kubectl get svc/${DEV_BLUE_SERVICE} -o yaml | yq .spec.selector.version",
+          returnStdout: true
+        ).trim()
+        BLUE_DEPLOYMENT_NAME = sh (
+            script: "kubectl get deployment -l version=${BLUE_VERSION} | awk '{if(NR>1)print $1}'",
+          returnStdout: true
+        ).trim()
         if (RESPONSE == "200") {
           echo "Application is working fine. Patching Blue service to point to latest deployment..."
           sh """kubectl patch svc "${DEV_BLUE_SERVICE}" -p '{\"spec\":{\"selector\":{\"app\":\"taxicab\",\"version\":\"${BUILD_NUMBER}\"}}}'"""
           sh "kubectl delete svc ${GREEN_SVC_NAME}"
+          sh "kubectl delete deployment ${BLUE_DEPLOYMENT_NAME}"
         }
         else {
           echo "Application didnot pass the test case. Not Working"
@@ -175,10 +183,19 @@ else {
           script: "curl -s -o /dev/null -w \"%{http_code}\" http://admin:password@${GREEN_LB}/swagger-ui.html -I",
           returnStdout: true
         ).trim()
+        BLUE_VERSION = sh (
+            script: "kubectl get svc/${DEV_BLUE_SERVICE} -o yaml | yq .spec.selector.version",
+          returnStdout: true
+        ).trim()
+        BLUE_DEPLOYMENT_NAME = sh (
+            script: "kubectl get deployment -l version=${BLUE_VERSION} | awk '{if(NR>1)print $1}'",
+          returnStdout: true
+        ).trim()
          if (RESPONSE == "200") {
           echo "Application is working fine. Patching Blue service to point to latest deployment..."
           sh """kubectl patch svc  "${PROD_BLUE_SERVICE}" -p '{\"spec\":{\"selector\":{\"app\":\"taxicab\",\"version\":\"${BUILD_NUMBER}\"}}}'"""
           sh "kubectl delete svc ${GREEN_SVC_NAME}"
+          sh "kubectl delete deployment ${BLUE_DEPLOYMENT_NAME}"
           currentBuild.result = "SUCCESS"
              return
         }
