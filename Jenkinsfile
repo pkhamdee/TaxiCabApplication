@@ -94,8 +94,9 @@ try
             script: "kubectl get svc/${DEV_BLUE_SERVICE} -o yaml | yq .spec.selector.version",
           returnStdout: true
         ).trim()
+          echo "${BLUE_VERSION}"
         BLUE_DEPLOYMENT_NAME = sh (
-            script: "kubectl get deployment -l version=${BLUE_VERSION} | awk '{if(NR>1)print $1}'",
+            script: "kubectl get deployment -l version='${BLUE_VERSION}' | awk '{if(NR>1)print $1}'",
           returnStdout: true
         ).trim()
         if (RESPONSE == "200") {
