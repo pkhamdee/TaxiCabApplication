@@ -116,6 +116,8 @@ userInput = input message: 'Proceed to Production?', parameters: [booleanParam(d
 }catch (err) {
     def user = err.getCauses()[0].getUser()
     echo "Aborted by:\n ${user}"
+    currentBuild.result = "SUCCESS"
+    return
 }
 
 stage('Deploy on Prod') {
