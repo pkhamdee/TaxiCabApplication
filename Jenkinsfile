@@ -93,7 +93,7 @@ try
           echo "${RESPONSE}"
         if (RESPONSE == "200") {
           echo "Application is working fine. Patching Blue service to point to latest deployment..."
-          sh """kubectl patch svc  ${DEV_BLUE_SERVICE} -p '{\"spec\":{\"selector\":{\"app\":\"taxicab\",\"version\":\"${BUILD_NUMBER}\"}}}'"""
+          sh """kubectl patch svc "${DEV_BLUE_SERVICE}" -p '{\"spec\":{\"selector\":{\"app\":\"taxicab\",\"version\":\"${BUILD_NUMBER}\"}}}'"""
           sh "kubectl delete svc ${GREEN_SVC_NAME}"
         }
         else {
