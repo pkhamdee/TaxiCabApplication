@@ -94,11 +94,11 @@ try
             script: "kubectl get svc/${DEV_BLUE_SERVICE} -o yaml | yq .spec.selector.version",
           returnStdout: true
         )
-          echo "${BLUE_VERSION}"
+        echo "${BLUE_VERSION}"
         BLUE_DEPLOYMENT_NAME = sh (
-            script: "kubectl get deployment -l version=\${BLUE_VERSION} | awk '{if(NR>1)print \$1}'",
+            script: "kubectl get deployment -l version=${BLUE_VERSION} | awk '{if(NR>1)print \$1}'",
           returnStdout: true
-        ).trim()
+        )
         if (RESPONSE == "200") {
           echo "Application is working fine. Patching Blue service to point to latest deployment..."
           sh """kubectl patch svc "${DEV_BLUE_SERVICE}" -p '{\"spec\":{\"selector\":{\"app\":\"taxicab\",\"version\":\"${BUILD_NUMBER}\"}}}'"""
