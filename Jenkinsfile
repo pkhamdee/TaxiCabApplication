@@ -3,6 +3,8 @@ properties([
     parameters([
         string(defaultValue: "master", description: 'Which Git Branch to clone?', name: 'GIT_BRANCH'),
         string(defaultValue: "1234567", description: 'AWS Account Number?', name: 'ACCOUNT'),
+        string(defaultValue: "taxicab-dev-svc", description: 'Blue Service Name to patch in Dev Environment', name: 'DEV_BLUE_SERVICE'),
+        string(defaultValue: "taxicab-prod-svc", description: 'Blue Service Name to patch in Prod Environment', name: 'PROD_BLUE_SERVICE'),
         string(defaultValue: "java-app", description: 'AWS ECR Repository where built docker images will be pushed.', name: 'ECR_REPO_NAME')
 ])
 ])
@@ -90,8 +92,8 @@ try
         ).trim()
           echo "${RESPONSE}"
         if (RESPONSE == "200") {
-          echo "Application is working fine"
-          sh """kubectl patch svc  taxicab-dev-svc -p '{\"spec\":{\"selector\":{\"app\":\"taxicab\",\"version\":\"${BUILD_NUMBER}\"}}}'"""
+          echo "Application is working fine. Patching Blue service to point to latest deployment..."
+          sh """kubectl patch svc  ${DEV_BLUE_SERVICE} -p '{\"spec\":{\"selector\":{\"app\":\"taxicab\",\"version\":\"${BUILD_NUMBER}\"}}}'"""
           sh "kubectl delete svc ${GREEN_SVC_NAME}"
         }
         else {
@@ -141,15 +143,16 @@ stage('Deploy on Prod') {
          ).trim()
         if (DESIRED.equals(CURRENT)) {
           currentBuild.result = "SUCCESS"
-          return
         } else {
           error("Deployment Unsuccessful.")
           currentBuild.result = "FAILURE"
+          return
         }
       }
     }
 else {
         echo "Aborted Production Deployment..!!"
+        return
     } 
 }
 }
@@ -169,9 +172,9 @@ else {
           script: "curl -s -o /dev/null -w \"%{http_code}\" http://admin:password@${GREEN_LB}/swagger-ui.html -I",
           returnStdout: true
         ).trim()
-        if (RESPONSE == 200) {
-          echo "Application is working fine. Patching Service."
-          sh "kubectl patch svc taxicab-dev-svc -p '{\"spec\":{\"selector\": {\"app\": \"taxicab\", \"version\": \"${BUILD_NUMBER}\"}}}'"
+         if (RESPONSE == "200") {
+          echo "Application is working fine. Patching Blue service to point to latest deployment..."
+          sh """kubectl patch svc  ${PROD_BLUE_SERVICE} -p '{\"spec\":{\"selector\":{\"app\":\"taxicab\",\"version\":\"${BUILD_NUMBER}\"}}}'"""
           sh "kubectl delete svc ${GREEN_SVC_NAME}"
         }
         else {
