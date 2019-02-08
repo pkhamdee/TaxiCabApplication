@@ -96,7 +96,7 @@ try
         )
           echo "${BLUE_VERSION}"
         BLUE_DEPLOYMENT_NAME = sh (
-            script: "kubectl get deployment -l version=${BLUE_VERSION} | awk '{if(NR>1)print $1}'",
+            script: """ #!/bin/bash kubectl get deployment -l version=${BLUE_VERSION} | awk '{if(NR>1)print $1}'""",
           returnStdout: true
         )
         if (RESPONSE == "200") {
