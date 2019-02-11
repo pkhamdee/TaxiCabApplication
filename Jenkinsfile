@@ -139,7 +139,7 @@ catch (err){
 def userInput
 try {
 	timeout(time: 60, unit: 'SECONDS') {
-	userInput = input message: 'Proceed to Production?', parameters: [booleanParam(defaultValue: false, description: 'Ticking this box will do a deployment on Prod', name: 'Deploy'),
+	userInput = input message: 'Proceed to Production?', parameters: [booleanParam(defaultValue: false, description: 'Ticking this box will do a deployment on Prod', name: 'DEPLOY_TO_PROD'),
                                                                  booleanParam(defaultValue: false, description: 'First Deployment on Prod?', name: 'PROD_BLUE_DEPLOYMENT')]}
 }
 catch (err) {
@@ -151,7 +151,7 @@ catch (err) {
 
 stage('Deploy on Prod') {
     node('master'){
-    	if (userInput == true) {
+    	if (userInput['DEPLOY_TO_PROD'] == true) {
     		echo "Deploying to Production..."       
        		withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/prod-config","IMAGE=${ACCOUNT}.dkr.ecr.us-east-1.amazonaws.com/${ECR_REPO_NAME}:${IMAGETAG}"]){
         		sh "sed -i 's|IMAGE|${IMAGE}|g' k8s/deployment.yaml"
@@ -191,7 +191,7 @@ stage('Deploy on Prod') {
   
 stage('Validate Prod Green Env') {
   node('master'){
-     if (env.PROD_BLUE_DEPLOYMENT == 'false') {
+     if (userInput['PROD_BLUE_DEPLOYMENT'] == 'false') {
     	withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/prod-config"]){
         	GREEN_SVC_NAME = sh (
           		script: "yq .metadata.name k8s/service.yaml | tr -d '\"'",
@@ -220,7 +220,7 @@ stage('Validate Prod Green Env') {
                                                                      
 stage('Patch Prod Blue Service') {
     node('master'){
-      if (env.PROD_BLUE_DEPLOYMENT == 'false') {
+      if (userInput['PROD_BLUE_DEPLOYMENT'] == 'false') {
       	withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/prod-config"]){
         	BLUE_VERSION = sh (
             	script: "kubectl get svc/${PROD_BLUE_SERVICE} -o yaml | yq .spec.selector.version",
