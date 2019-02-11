@@ -143,6 +143,16 @@ stage('Deploy on Prod') {
           returnStdout: true
         ).trim()
         echo "Creating k8s resources..."
+        BLUE_VERSION = sh (
+            script: "kubectl get svc/${DEV_BLUE_SERVICE} -o yaml | yq .spec.selector.version",
+          returnStdout: true
+        ).trim()
+        CMD = "kubectl get deployment -l version=${BLUE_VERSION} | awk '{if(NR>1)print \$1}'"
+        echo "${CMD}"
+        BLUE_DEPLOYMENT_NAME = sh (
+            script: "${CMD}",
+          returnStdout: true
+        ).trim()
         sleep 180
         DESIRED= sh (
           script: "kubectl get deployment/$DEPLOYMENT | awk '{print \$2}' | grep -v DESIRED",
@@ -180,16 +190,16 @@ else {
           returnStdout: true
         ).trim()
         echo "Green ENV LB: ${GREEN_LB}"
-        RESPONSE = sh (
-          script: "curl -s -o /dev/null -w \"%{http_code}\" http://admin:password@${GREEN_LB}/swagger-ui.html -I",
-          returnStdout: true
-        ).trim()
         BLUE_VERSION = sh (
             script: "kubectl get svc/${DEV_BLUE_SERVICE} -o yaml | yq .spec.selector.version",
           returnStdout: true
         ).trim()
         BLUE_DEPLOYMENT_NAME = sh (
             script: "kubectl get deployment -l version=${BLUE_VERSION} | awk '{if(NR>1)print \$1}'",
+          returnStdout: true
+        ).trim()
+        RESPONSE = sh (
+          script: "curl -s -o /dev/null -w \"%{http_code}\" http://admin:password@${GREEN_LB}/swagger-ui.html -I",
           returnStdout: true
         ).trim()
          if (RESPONSE == "200") {
