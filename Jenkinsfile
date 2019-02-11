@@ -191,7 +191,7 @@ stage('Deploy on Prod') {
   
 stage('Validate Prod Green Env') {
   node('master'){
-     if (userInput['PROD_BLUE_DEPLOYMENT'] == 'false') {
+     if (userInput['PROD_BLUE_DEPLOYMENT'] == false) {
     	withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/prod-config"]){
         	GREEN_SVC_NAME = sh (
           		script: "yq .metadata.name k8s/service.yaml | tr -d '\"'",
@@ -220,7 +220,7 @@ stage('Validate Prod Green Env') {
                                                                      
 stage('Patch Prod Blue Service') {
     node('master'){
-      if (userInput['PROD_BLUE_DEPLOYMENT'] == 'false') {
+      if (userInput['PROD_BLUE_DEPLOYMENT'] == false) {
       	withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/prod-config"]){
         	BLUE_VERSION = sh (
             	script: "kubectl get svc/${PROD_BLUE_SERVICE} -o yaml | yq .spec.selector.version",
