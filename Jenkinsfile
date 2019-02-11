@@ -3,6 +3,7 @@ properties([
     parameters([
         string(defaultValue: "master", description: 'Which Git Branch to clone?', name: 'GIT_BRANCH'),
         string(defaultValue: "1234567", description: 'AWS Account Number?', name: 'ACCOUNT'),
+        booleanParam(defaultValue: false, description: 'Deploying for the first time?', name: 'BLUE_DEPLOYMENT'),
         string(defaultValue: "taxicab-dev-svc", description: 'Blue Service Name to patch in Dev Environment', name: 'DEV_BLUE_SERVICE'),
         string(defaultValue: "taxicab-prod-svc", description: 'Blue Service Name to patch in Prod Environment', name: 'PROD_BLUE_SERVICE'),
         string(defaultValue: "java-app", description: 'AWS ECR Repository where built docker images will be pushed.', name: 'ECR_REPO_NAME')
@@ -76,42 +77,42 @@ try
   }
   stage('Validate Dev Green Env') {
     node('master'){
-      withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/dev-config"]){
-        GREEN_SVC_NAME = sh (
-          script: "yq .metadata.name k8s/service.yaml | tr -d '\"'",
-          returnStdout: true
-        ).trim()
-        GREEN_LB = sh (
-          script: "kubectl get svc ${GREEN_SVC_NAME} -o jsonpath=\"{.status.loadBalancer.ingress[*].hostname}\"",
-          returnStdout: true
-        ).trim()
-        echo "Green ENV LB: ${GREEN_LB}"
-        BLUE_VERSION = sh (
-            script: "kubectl get svc/${DEV_BLUE_SERVICE} -o yaml | yq .spec.selector.version",
-          returnStdout: true
-        ).trim()
-        CMD = "kubectl get deployment -l version=${BLUE_VERSION} | awk '{if(NR>1)print \$1}'"
-        BLUE_DEPLOYMENT_NAME = sh (
-            script: "${CMD}",
-          returnStdout: true
-        ).trim()
-        echo "${BLUE_DEPLOYMENT_NAME}"
-        RESPONSE = sh (
-          script: "curl -s -o /dev/null -w \"%{http_code}\" http://admin:password@${GREEN_LB}/swagger-ui.html -I",
-          returnStdout: true
-        ).trim()
-        if (RESPONSE == "200") {
-          echo "Application is working fine. Patching Blue service to point to latest deployment..."
-          sh """kubectl patch svc "${DEV_BLUE_SERVICE}" -p '{\"spec\":{\"selector\":{\"app\":\"taxicab\",\"version\":\"${BUILD_NUMBER}\"}}}'"""
-          sh "kubectl delete svc ${GREEN_SVC_NAME}"
-          sh "kubectl delete deployment ${BLUE_DEPLOYMENT_NAME}"
+        withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/dev-config"]){
+            GREEN_SVC_NAME = sh (
+              script: "yq .metadata.name k8s/service.yaml | tr -d '\"'",
+              returnStdout: true
+            ).trim()
+            GREEN_LB = sh (
+              script: "kubectl get svc ${GREEN_SVC_NAME} -o jsonpath=\"{.status.loadBalancer.ingress[*].hostname}\"",
+              returnStdout: true
+            ).trim()
+            echo "Green ENV LB: ${GREEN_LB}"
+            BLUE_VERSION = sh (
+              script: "kubectl get svc/${DEV_BLUE_SERVICE} -o yaml | yq .spec.selector.version",
+              returnStdout: true
+            ).trim()
+            CMD = "kubectl get deployment -l version=${BLUE_VERSION} | awk '{if(NR>1)print \$1}'"
+            BLUE_DEPLOYMENT_NAME = sh (
+              script: "${CMD}",
+              returnStdout: true
+            ).trim()
+            echo "${BLUE_DEPLOYMENT_NAME}"
+            RESPONSE = sh (
+              script: "curl -s -o /dev/null -w \"%{http_code}\" http://admin:password@${GREEN_LB}/swagger-ui.html -I",
+              returnStdout: true
+            ).trim()
+            if (RESPONSE == "200") {
+              echo "Application is working fine. Patching Blue service to point to latest deployment..."
+              sh """kubectl patch svc "${DEV_BLUE_SERVICE}" -p '{\"spec\":{\"selector\":{\"app\":\"taxicab\",\"version\":\"${BUILD_NUMBER}\"}}}'"""
+              echo "Deleting Blue Environment..."
+              sh "kubectl delete svc ${GREEN_SVC_NAME}"
+              sh "kubectl delete deployment ${BLUE_DEPLOYMENT_NAME}"
+            }
+            else {
+              echo "Application didnot pass the test case. Not Working"
+              currentBuild.result = "FAILURE"
+            }
         }
-        else {
-          echo "Application didnot pass the test case. Not Working"
-          currentBuild.result = "FAILURE"
-        }
-      }
-    }
   }
 }
 catch (err){
