@@ -82,7 +82,7 @@ try {
     node('master'){
     	when 
     	{
-    		environment name: 'BLUE_DEPLOYMENT', value: 'true'
+    		environment name: 'BLUE_DEPLOYMENT', value: 'false'
     	}
         withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/dev-config"]){
             GREEN_SVC_NAME = sh (
@@ -113,7 +113,7 @@ try {
   	node('master'){
   		when 
         {
-        	environment name: 'BLUE_DEPLOYMENT', value: 'true'
+        	environment name: 'BLUE_DEPLOYMENT', value: 'false'
         }
         withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/dev-config"]){
             BLUE_VERSION = sh (
@@ -197,7 +197,7 @@ stage('Validate Prod Green Env') {
 	node('master'){
 		when 
 		{
-			environment name: 'PROD_BLUE_DEPLOYMENT', value: 'true'
+			environment name: 'PROD_BLUE_DEPLOYMENT', value: 'false'
 		}
     	withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/prod-config"]){
         	GREEN_SVC_NAME = sh (
@@ -228,7 +228,7 @@ stage('Patch Prod Blue Service') {
     node('master'){
          when 
          {
-         	environment name: 'PROD_BLUE_DEPLOYMENT', value: 'true'
+         	environment name: 'PROD_BLUE_DEPLOYMENT', value: 'false'
          	}
       	withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/prod-config"]){
         	BLUE_VERSION = sh (
