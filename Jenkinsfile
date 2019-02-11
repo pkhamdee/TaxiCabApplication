@@ -71,12 +71,17 @@ try
           return
         } else {
           error("Deployment Unsuccessful.")
+          currentBuild.result = "FAILURE"
+          return
         }
       }
     }
   }
   stage('Validate Dev Green Env') {
     node('master'){
+        when {
+                environment name: 'BLUE_DEPLOYMENT', value: 'true'
+            }
         withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/dev-config"]){
             GREEN_SVC_NAME = sh (
               script: "yq .metadata.name k8s/service.yaml | tr -d '\"'",
@@ -87,6 +92,26 @@ try
               returnStdout: true
             ).trim()
             echo "Green ENV LB: ${GREEN_LB}"
+            RESPONSE = sh (
+              script: "curl -s -o /dev/null -w \"%{http_code}\" http://admin:password@${GREEN_LB}/swagger-ui.html -I",
+              returnStdout: true
+            ).trim()
+            if (RESPONSE == "200") {
+              echo "Application is working fine. Proceeding to patch the service..."
+            }
+            else {
+              echo "Application didnot pass the test case. Not Working"
+              currentBuild.result = "FAILURE"
+            }
+        }
+  }
+}
+      stage('Patch Dev Blue Service') {
+    node('master'){
+        when {
+                environment name: 'BLUE_DEPLOYMENT', value: 'true'
+            }
+        withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/dev-config"]){
             BLUE_VERSION = sh (
               script: "kubectl get svc/${DEV_BLUE_SERVICE} -o yaml | yq .spec.selector.version",
               returnStdout: true
@@ -97,23 +122,12 @@ try
               returnStdout: true
             ).trim()
             echo "${BLUE_DEPLOYMENT_NAME}"
-            RESPONSE = sh (
-              script: "curl -s -o /dev/null -w \"%{http_code}\" http://admin:password@${GREEN_LB}/swagger-ui.html -I",
-              returnStdout: true
-            ).trim()
-            if (RESPONSE == "200") {
-              echo "Application is working fine. Patching Blue service to point to latest deployment..."
               sh """kubectl patch svc "${DEV_BLUE_SERVICE}" -p '{\"spec\":{\"selector\":{\"app\":\"taxicab\",\"version\":\"${BUILD_NUMBER}\"}}}'"""
               echo "Deleting Blue Environment..."
               sh "kubectl delete svc ${GREEN_SVC_NAME}"
               sh "kubectl delete deployment ${BLUE_DEPLOYMENT_NAME}"
-            }
-            else {
-              echo "Application didnot pass the test case. Not Working"
-              currentBuild.result = "FAILURE"
-            }
         }
-  }
+    }
 }
 catch (err){
   currentBuild.result = "FAILURE"
@@ -122,7 +136,8 @@ catch (err){
 def userInput
 try {
 timeout(time: 60, unit: 'SECONDS') {
-userInput = input message: 'Proceed to Production?', parameters: [booleanParam(defaultValue: false, description: 'Ticking this box will do a deployment on Prod', name: 'Deploy')]
+userInput = input message: 'Proceed to Production?', parameters: [booleanParam(defaultValue: false, description: 'Ticking this box will do a deployment on Prod', name: 'Deploy'),
+                                                                 booleanParam(defaultValue: false, description: 'First Deployment on Prod?', name: 'PROD_BLUE_DEPLOYMENT']
 }
 }catch (err) {
     def user = err.getCauses()[0].getUser()
@@ -172,6 +187,9 @@ else {
 }
   stage('Validate Prod Green Env') {
     node('master'){
+         when {
+                environment name: 'PROD_BLUE_DEPLOYMENT', value: 'true'
+            }
       withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/prod-config"]){
         GREEN_SVC_NAME = sh (
           script: "yq .metadata.name k8s/service.yaml | tr -d '\"'",
@@ -182,6 +200,27 @@ else {
           returnStdout: true
         ).trim()
         echo "Green ENV LB: ${GREEN_LB}"
+        RESPONSE = sh (
+          script: "curl -s -o /dev/null -w \"%{http_code}\" http://admin:password@${GREEN_LB}/swagger-ui.html -I",
+          returnStdout: true
+        ).trim()
+         if (RESPONSE == "200") {
+          echo "Application is working fine. Proceeding to patch the service to point to the latest deployment..."
+        }
+        else {
+          echo "Application didnot pass the test case. Not Working"
+          currentBuild.result = "FAILURE"
+        }
+      }
+    }
+  }
+                                                                     
+stage('Patch Prod Blue Service') {
+    node('master'){
+         when {
+                environment name: 'PROD_BLUE_DEPLOYMENT', value: 'true'
+            }
+      withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/prod-config"]){
         BLUE_VERSION = sh (
             script: "kubectl get svc/${PROD_BLUE_SERVICE} -o yaml | yq .spec.selector.version",
           returnStdout: true
@@ -192,22 +231,10 @@ else {
           returnStdout: true
         ).trim()
         echo "${BLUE_DEPLOYMENT_NAME}"
-        RESPONSE = sh (
-          script: "curl -s -o /dev/null -w \"%{http_code}\" http://admin:password@${GREEN_LB}/swagger-ui.html -I",
-          returnStdout: true
-        ).trim()
-         if (RESPONSE == "200") {
-          echo "Application is working fine. Patching Blue service to point to latest deployment..."
           sh """kubectl patch svc  "${PROD_BLUE_SERVICE}" -p '{\"spec\":{\"selector\":{\"app\":\"taxicab\",\"version\":\"${BUILD_NUMBER}\"}}}'"""
+          echo "Deleting Blue Environment..."
           sh "kubectl delete svc ${GREEN_SVC_NAME}"
           sh "kubectl delete deployment ${BLUE_DEPLOYMENT_NAME}"
-          currentBuild.result = "SUCCESS"
-             return
-        }
-        else {
-          echo "Application didnot pass the test case. Not Working"
-          currentBuild.result = "FAILURE"
-        }
       }
     }
   }
