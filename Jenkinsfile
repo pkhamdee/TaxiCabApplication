@@ -80,10 +80,7 @@ try {
   
   stage('Validate Dev Green Env') {
     node('master'){
-    	when 
-    	{
-    		environment name: 'BLUE_DEPLOYMENT', value: 'false'
-    	}
+      if (env.BLUE_DEPLOYMENT == 'false') {
         withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/dev-config"]){
             GREEN_SVC_NAME = sh (
               script: "yq .metadata.name k8s/service.yaml | tr -d '\"'",
@@ -106,15 +103,13 @@ try {
               currentBuild.result = "FAILURE"
             }
         }
+      }
     }
   }
       
   stage('Patch Dev Blue Service') {
-  	node('master'){
-  		when 
-        {
-        	environment name: 'BLUE_DEPLOYMENT', value: 'false'
-        }
+    node('master'){
+      if (env.BLUE_DEPLOYMENT == 'false') {
         withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/dev-config"]){
             BLUE_VERSION = sh (
               script: "kubectl get svc/${DEV_BLUE_SERVICE} -o yaml | yq .spec.selector.version",
@@ -131,6 +126,7 @@ try {
             sh "kubectl delete svc ${GREEN_SVC_NAME}"
             sh "kubectl delete deployment ${BLUE_DEPLOYMENT_NAME}"
         }
+      }
     }
   }
 }
@@ -185,20 +181,17 @@ stage('Deploy on Prod') {
         		}
       		}
     	}
-		else {
+	else {
         	echo "Aborted Production Deployment..!!"
         	currentBuild.result = "SUCCESS"
         	return
     	} 
-	}
+    }
 }
   
 stage('Validate Prod Green Env') {
-	node('master'){
-		when 
-		{
-			environment name: 'PROD_BLUE_DEPLOYMENT', value: 'false'
-		}
+  node('master'){
+     if (env.PROD_BLUE_DEPLOYMENT == 'false') {
     	withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/prod-config"]){
         	GREEN_SVC_NAME = sh (
           		script: "yq .metadata.name k8s/service.yaml | tr -d '\"'",
@@ -221,15 +214,13 @@ stage('Validate Prod Green Env') {
           		currentBuild.result = "FAILURE"
         	}
       	}
+      }
     }
 }
                                                                      
 stage('Patch Prod Blue Service') {
     node('master'){
-         when 
-         {
-         	environment name: 'PROD_BLUE_DEPLOYMENT', value: 'false'
-         	}
+      if (env.PROD_BLUE_DEPLOYMENT == 'false') {
       	withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/prod-config"]){
         	BLUE_VERSION = sh (
             	script: "kubectl get svc/${PROD_BLUE_SERVICE} -o yaml | yq .spec.selector.version",
@@ -246,5 +237,6 @@ stage('Patch Prod Blue Service') {
           	sh "kubectl delete svc ${GREEN_SVC_NAME}"
           	sh "kubectl delete deployment ${BLUE_DEPLOYMENT_NAME}"
       	}
+      }
     }
 }
