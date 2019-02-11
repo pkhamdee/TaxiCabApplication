@@ -144,8 +144,7 @@ def userInput
 try {
 	timeout(time: 60, unit: 'SECONDS') {
 	userInput = input message: 'Proceed to Production?', parameters: [booleanParam(defaultValue: false, description: 'Ticking this box will do a deployment on Prod', name: 'Deploy'),
-                                                                 booleanParam(defaultValue: false, description: 'First Deployment on Prod?', name: 'PROD_BLUE_DEPLOYMENT']
-    }
+                                                                 booleanParam(defaultValue: false, description: 'First Deployment on Prod?', name: 'PROD_BLUE_DEPLOYMENT')]}
 }
 catch (err) {
     def user = err.getCauses()[0].getUser()
