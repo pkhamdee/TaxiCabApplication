@@ -66,6 +66,7 @@ try
             script: "${CMD}",
           returnStdout: true
         ).trim()
+            echo "${BLUE_DEPLOYMENT_NAME}"
         sleep 180
         DESIRED= sh (
           script: "kubectl get deployment/$DEPLOYMENT | awk '{print \$2}' | grep -v DESIRED",
