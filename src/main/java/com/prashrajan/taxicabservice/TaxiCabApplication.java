@@ -44,7 +44,7 @@ public class TaxiCabApplication extends WebMvcConfigurerAdapter {
 
     private ApiInfo generateApiInfo()
     {
-        return new ApiInfo("Sample TaxiCab Serivce", "This is a sample service with sprint boot, maven, java 8 with Domain driven design pattern that can be containerize using docker as a seperate microservice ", "Version 1.0",
+        return new ApiInfo("PowerupCloud Sample TaxiCab Service", "This is a sample service with sprint boot, maven, java 8 with Domain driven design pattern that can be containerize using docker as a seperate microservice ", "Version 1.0",
             "", "", "", "");
     }
 }
