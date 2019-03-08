@@ -3,8 +3,6 @@ properties([
 	parameters([
         string(defaultValue: "master", description: 'Which Git Branch to clone?', name: 'GIT_BRANCH'),
         string(defaultValue: "1234567", description: 'AWS Account Number?', name: 'ACCOUNT'),
-        booleanParam(defaultValue: false, description: 'Deploying for the first time?', name: 'BLUE_DEPLOYMENT'),
-        string(defaultValue: "taxicab-dev-svc", description: 'Blue Service Name to patch in Dev Environment', name: 'DEV_BLUE_SERVICE'),
         string(defaultValue: "taxicab-prod-svc", description: 'Blue Service Name to patch in Prod Environment', name: 'PROD_BLUE_SERVICE'),
         string(defaultValue: "java-app", description: 'AWS ECR Repository where built docker images will be pushed.', name: 'ECR_REPO_NAME')
 	])
