@@ -48,7 +48,7 @@ try {
         	sh "sed -i 's|IMAGE|${IMAGE}|g' k8s/deployment.yaml"
         	sh "sed -i 's|ACCOUNT|${ACCOUNT}|g' k8s/service.yaml"
         	sh "sed -i 's|ENVIRONMENT|dev|g' k8s/*.yaml"
-        	sh "sed -i 's|BUILD_NUMBER|${BUILD_NUMBER}|g' k8s/*.yaml"
+        	sh "sed -i 's|BUILD_NUMBER|01|g' k8s/*.yaml"
         	sh "kubectl apply -f k8s"
         	DEPLOYMENT = sh (
           		script: 'cat k8s/deployment.yaml | yq -r .metadata.name',
