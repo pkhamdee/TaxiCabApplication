@@ -106,29 +106,33 @@ pipeline {
     stage('Deploy on Dev') {
       steps {
         //withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/dev-config","IMAGE=${ACCOUNT}.dkr.ecr.us-east-1.amazonaws.com/${ECR_REPO_NAME}:${IMAGETAG}"]){
-        sh "sed -i 's|IMAGE|${IMAGE_NAME}:${IMAGETAG}|g' k8s/deployment.yaml"
+        sh "sed -i 's|IMAGE|${DOCKER_REG}/${DOCKER_PROJ}/${IMAGE_NAME}:${IMAGETAG}|g' k8s/deployment.yaml"
         sh "sed -i 's|ENVIRONMENT|dev|g' k8s/*.yaml"
-        sh "sed -i 's|BUILD_NUMBER|${GIT_COMMIT_ID}|g' k8s/*.yaml"
+        sh "sed -i 's|BUILD_NUMBER|01|g' k8s/*.yaml"
 
-        sh "kubectl apply -f k8s"
+        sh "kubectl apply -f k8s -n taxicab"
 
         script {
+          /*
           DEPLOYMENT = sh (
             script: 'cat k8s/deployment.yaml | yq -r .metadata.name',
             returnStdout: true
             ).trim()
+          */
+
+          DEPLOYMENT = "taxicap-dev-01"  
 
           echo "Creating k8s resources..."
 
           sleep 180
 
           DESIRED= sh (
-            script: "kubectl get deployment/$DEPLOYMENT | awk '{print \$2}' | grep -v DESIRED",
+            script: "kubectl get deployment/$DEPLOYMENT -n taxicab | awk '{print \$2}' | grep -v DESIRED",
             returnStdout: true
             ).trim()
 
           CURRENT= sh (
-            script: "kubectl get deployment/$DEPLOYMENT | awk '{print \$3}' | grep -v CURRENT",
+            script: "kubectl get deployment/$DEPLOYMENT -n taxicab | awk '{print \$3}' | grep -v CURRENT",
             returnStdout: true
             ).trim()
 
@@ -169,27 +173,31 @@ pipeline {
           if (userInput['DEPLOY_TO_PROD'] == true) {
             echo "Deploying to Production..."       
             //withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/prod-config","IMAGE=${ACCOUNT}.dkr.ecr.us-east-1.amazonaws.com/${ECR_REPO_NAME}:${IMAGETAG}"]){
-            sh "sed -i 's|IMAGE|${IMAGE}|g' k8s/deployment.yaml"
+            sh "sed -i 's|IMAGE|${DOCKER_REG}/${DOCKER_PROJ}/${IMAGE_NAME}:${IMAGETAG}|g' k8s/deployment.yaml"
             sh "sed -i 's|dev|prod|g' k8s/*.yaml"
 
-            sh "kubectl apply -f k8s"
+            sh "kubectl apply -f k8s -n taxicab"
 
+            /*
             DEPLOYMENT = sh (
               script: 'cat k8s/deployment.yaml | yq -r .metadata.name',
               returnStdout: true
               ).trim()
+            */
+
+            DEPLOYMENT = "taxicap-prod-01"
 
             echo "Creating k8s resources..."
 
             sleep 180
 
             DESIRED= sh (
-              script: "kubectl get deployment/$DEPLOYMENT | awk '{print \$2}' | grep -v DESIRED",
+              script: "kubectl get deployment/$DEPLOYMENT -n taxicab | awk '{print \$2}' | grep -v DESIRED",
               returnStdout: true
               ).trim()
 
             CURRENT= sh (
-              script: "kubectl get deployment/$DEPLOYMENT | awk '{print \$3}' | grep -v CURRENT",
+              script: "kubectl get deployment/$DEPLOYMENT -n taxicab | awk '{print \$3}' | grep -v CURRENT",
               returnStdout: true
               ).trim()
 
@@ -221,7 +229,7 @@ pipeline {
             ).trim()
 
           GREEN_LB = sh (
-            script: "kubectl get svc ${GREEN_SVC_NAME} -o jsonpath=\"{.status.loadBalancer.ingress[*].hostname}\"",
+            script: "kubectl get svc ${GREEN_SVC_NAME} -n taxicab -o jsonpath=\"{.status.loadBalancer.ingress[*].hostname}\"",
             returnStdout: true
             ).trim()
 
@@ -247,11 +255,11 @@ pipeline {
         if (userInput['PROD_BLUE_DEPLOYMENT'] == false) {
         //withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/prod-config"]){
           BLUE_VERSION = sh (
-            script: "kubectl get svc/${PROD_BLUE_SERVICE} -o yaml | yq .spec.selector.version",
+            script: "kubectl get svc/${PROD_BLUE_SERVICE} -n taxicab -o yaml | yq .spec.selector.version",
             returnStdout: true
             ).trim()
 
-          CMD = "kubectl get deployment -l version=${BLUE_VERSION} | awk '{if(NR>1)print \$1}'"
+          CMD = "kubectl get deployment -n taxicab -l version=${BLUE_VERSION} | awk '{if(NR>1)print \$1}'"
           
           BLUE_DEPLOYMENT_NAME = sh (
             script: "${CMD}",
@@ -259,10 +267,10 @@ pipeline {
             ).trim()
 
           echo "${BLUE_DEPLOYMENT_NAME}"
-          sh """kubectl patch svc  "${PROD_BLUE_SERVICE}" -p '{\"spec\":{\"selector\":{\"app\":\"taxicab\",\"version\":\"${BUILD_NUMBER}\"}}}'"""
+          sh """kubectl patch svc  "${PROD_BLUE_SERVICE}" -n taxicab -p '{\"spec\":{\"selector\":{\"app\":\"taxicab\",\"version\":\"${BUILD_NUMBER}\"}}}'"""
           echo "Deleting Blue Environment..."
-          sh "kubectl delete svc ${GREEN_SVC_NAME}"
-          sh "kubectl delete deployment ${BLUE_DEPLOYMENT_NAME}"
+          sh "kubectl delete svc ${GREEN_SVC_NAME} -n taxicab"
+          sh "kubectl delete deployment ${BLUE_DEPLOYMENT_NAME} -n taxicab"
         }
       }
     }
