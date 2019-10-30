@@ -117,14 +117,14 @@ pipeline {
       steps {
 
         sh "sed -i 's|IMAGE|${DOCKER_REG}/${DOCKER_PROJ}/${IMAGE_NAME}:${IMAGETAG}|g' k8s/deployment.yaml"
-        sh "sed -i 's|ENVIRONMENT|dev|g' k8s/*.yaml"
+        sh "sed -i 's|ENVIRONMENT|dev01|g' k8s/*.yaml"
         sh "sed -i 's|BUILD_NUMBER|${BUILD_NUMBER}|g' k8s/*.yaml"
 
         script {
 
           sh "kubectl apply -f k8s -n taxicab-dev" 
 
-          DEPLOYMENT = "taxicab-dev-${BUILD_NUMBER}"  
+          DEPLOYMENT = "taxicab-dev01-${BUILD_NUMBER}"  
 
           echo "Creating k8s ${DEPLOYMENT} resources..."
 
@@ -182,7 +182,7 @@ pipeline {
           if (userInput['DEPLOY_TO_PROD'] == true) {
             echo "Deploying to Production..."       
 
-            sh "sed -i 's|dev|prod|g' k8s/*.yaml"
+            sh "sed -i 's|dev01|prod|g' k8s/*.yaml"
 
             sh "kubectl apply -f k8s -n taxicab-prod"
 
@@ -281,17 +281,21 @@ pipeline {
 
             BLUE_SVC_NAME = "taxicab-prod-svc-${BLUE_VERSION}"  
 
+            BLUE_ING_NAME = "taxicab-prod-${BLUE_VERSION}"
+
             sh """kubectl patch svc "${PROD_BLUE_SERVICE}" -n taxicab-prod -p '{\"spec\":{\"selector\":{\"app\":\"taxicab\",\"version\":\"${BUILD_NUMBER}\"}}}'"""
 
             echo "Deleting Blue Environment... service = ${BLUE_SVC_NAME}, deployment = ${BLUE_DEPLOYMENT_NAME}"
             sh "kubectl delete svc ${BLUE_SVC_NAME} -n taxicab-prod"
             sh "kubectl delete deployment ${BLUE_DEPLOYMENT_NAME} -n taxicab-prod"
+            sh "kubectl delete ingress ${BLUE_ING_NAME} -n taxicab-prod"
 
           } else {
             echo "Create new ${PROD_BLUE_SERVICE}"
             sh "sed -i 's|taxicab-prod-svc-${BUILD_NUMBER}|${PROD_BLUE_SERVICE}|g' k8s/service.yaml"
-            sh "sed -i 's|taxicab-prod-${BUILD_NUMBER}|taxicab-prod|g' k8s/service.yaml"
+            sh "sed -i 's|taxicab-prod-${BUILD_NUMBER}|taxicab-prod|g' k8s/ingress.yaml"
             sh "kubectl apply -f k8s/service.yaml -n taxicab-prod"
+            sh "kubectl apply -f k8s/ingress.yaml -n taxicab-prod"
           }
         }  
       }
