@@ -3,14 +3,12 @@ kind: Service
 metadata:
   name: taxicab-ENVIRONMENT-svc-BUILD_NUMBER
 spec:
-  type: NodePort
+  type: ClusterIP
   ports:
-    - nodePort: 30080
-      port: 80
+    - port: 80
       targetPort: 8080
       name: http
     - name: "https"
-      nodePort: 30443
       port: 443
       targetPort: 8080
       protocol: "TCP"

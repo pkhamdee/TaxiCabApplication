@@ -1,5 +1,13 @@
 #!/usr/bin/env groovy
 
+def userInput
+
+/* Create the kubernetes namespace */
+def createNamespace (namespace) {
+    echo "Creating namespace ${namespace} if needed"
+
+    sh "[ ! -z \"\$(kubectl get ns ${namespace} -o name 2>/dev/null)\" ] || kubectl create ns ${namespace}"
+}
 
 pipeline {
 
@@ -18,9 +26,6 @@ pipeline {
     PROD_BLUE_SERVICE = 'taxicab-prod-svc'
   }
 
-  // In this example, all is built and run from the master
-  agent { node { label 'master' } }
-
   /*
   properties([
 	  parameters([
@@ -32,6 +37,9 @@ pipeline {
 	  ])
   ])
   */
+
+  // In this example, all is built and run from the master
+  agent { node { label 'master' } }
   
   //Pipelie stages
   stages {
@@ -61,14 +69,17 @@ pipeline {
         }  
 
         echo "DOCKER_REG is ${DOCKER_REG}"
+
+        script {
+          namespace = 'taxicab'
+          createNamespace (namespace)   
+        }
       }
     }
 
     stage('Build Maven'){
       steps {
-        //withMaven(maven: 'apache-maven3.6'){
-          sh "mvn clean package"
-        //} 
+        sh "mvn clean package"
       }
     }
 
@@ -77,7 +88,7 @@ pipeline {
 
         script {
           GIT_COMMIT_ID = sh (
-            script: 'git log -1 --pretty=%H',
+            script: 'git log -1 --pretty=%h',
             returnStdout: true
             ).trim()
 
@@ -87,7 +98,9 @@ pipeline {
             ).trim()
 
           echo "Git commit id: ${GIT_COMMIT_ID}"
+
           IMAGETAG="${GIT_COMMIT_ID}-${TIMESTAMP}"
+
         } 
 
         //build image
@@ -105,40 +118,34 @@ pipeline {
 
     stage('Deploy on Dev') {
       steps {
-        //withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/dev-config","IMAGE=${ACCOUNT}.dkr.ecr.us-east-1.amazonaws.com/${ECR_REPO_NAME}:${IMAGETAG}"]){
+
         sh "sed -i 's|IMAGE|${DOCKER_REG}/${DOCKER_PROJ}/${IMAGE_NAME}:${IMAGETAG}|g' k8s/deployment.yaml"
         sh "sed -i 's|ENVIRONMENT|dev|g' k8s/*.yaml"
-        sh "sed -i 's|BUILD_NUMBER|01|g' k8s/*.yaml"
-
-        sh "kubectl apply -f k8s -n taxicab"
+        sh "sed -i 's|BUILD_NUMBER|${BUILD_NUMBER}|g' k8s/*.yaml"
 
         script {
-          /*
-          DEPLOYMENT = sh (
-            script: 'cat k8s/deployment.yaml | yq -r .metadata.name',
-            returnStdout: true
-            ).trim()
-          */
 
-          DEPLOYMENT = "taxicap-dev-01"  
+          sh "kubectl apply -f k8s -n taxicab" 
+
+          DEPLOYMENT = "taxicab-dev-${BUILD_NUMBER}"  
 
           echo "Creating k8s resources..."
 
-          sleep 180
+          sleep 10
 
           DESIRED= sh (
-            script: "kubectl get deployment/$DEPLOYMENT -n taxicab | awk '{print \$2}' | grep -v DESIRED",
+            script: "kubectl get deployment/$DEPLOYMENT -n taxicab | awk '{print \$2}' | grep -v READY | awk -F'/' '{print \$1}'",
             returnStdout: true
             ).trim()
 
           CURRENT= sh (
-            script: "kubectl get deployment/$DEPLOYMENT -n taxicab | awk '{print \$3}' | grep -v CURRENT",
+            script: "kubectl get deployment/$DEPLOYMENT -n taxicab | awk '{print \$2}' | grep -v READY | awk -F'/' '{print \$2}'",
             returnStdout: true
             ).trim()
 
           if (DESIRED.equals(CURRENT)) {
             currentBuild.result = "SUCCESS"
-            return
+
           } else {
             error("Deployment Unsuccessful.")
             currentBuild.result = "FAILURE"
@@ -151,19 +158,10 @@ pipeline {
     stage('Go for Production?') {
       steps {
         script {
-          def userInput
-          try {
-            timeout(time: 60, unit: 'SECONDS') {
-            userInput = input message: 'Proceed to Production?', parameters: [booleanParam(defaultValue: false, description: 'Ticking this box will do a deployment on Prod', name: 'DEPLOY_TO_PROD'),
-                                                                 booleanParam(defaultValue: false, description: 'First Deployment on Prod?', name: 'PROD_BLUE_DEPLOYMENT')]}
-          } catch (err) {
-            def user = err.getCauses()[0].getUser()
-            echo "Aborted by:\n ${user}"
-            currentBuild.result = "SUCCESS"
-            return
-          }
+            userInput = input message: 'Proceed to Production?', 
+                            parameters: [booleanParam(defaultValue: false, description: 'Ticking this box will do a deployment on Prod', name: 'DEPLOY_TO_PROD'),
+                                         booleanParam(defaultValue: false, description: 'First Deployment on Prod?', name: 'PROD_BLUE_DEPLOYMENT')]
         }
-        
       }
     }
 
@@ -172,37 +170,30 @@ pipeline {
         script {
           if (userInput['DEPLOY_TO_PROD'] == true) {
             echo "Deploying to Production..."       
-            //withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/prod-config","IMAGE=${ACCOUNT}.dkr.ecr.us-east-1.amazonaws.com/${ECR_REPO_NAME}:${IMAGETAG}"]){
-            sh "sed -i 's|IMAGE|${DOCKER_REG}/${DOCKER_PROJ}/${IMAGE_NAME}:${IMAGETAG}|g' k8s/deployment.yaml"
+
             sh "sed -i 's|dev|prod|g' k8s/*.yaml"
 
             sh "kubectl apply -f k8s -n taxicab"
 
-            /*
-            DEPLOYMENT = sh (
-              script: 'cat k8s/deployment.yaml | yq -r .metadata.name',
-              returnStdout: true
-              ).trim()
-            */
+            DEPLOYMENT = "taxicab-prod-${BUILD_NUMBER}"
 
-            DEPLOYMENT = "taxicap-prod-01"
+            echo "Creating k8s $DEPLOYMENT resources..."
 
-            echo "Creating k8s resources..."
-
-            sleep 180
+            sleep 10
 
             DESIRED= sh (
-              script: "kubectl get deployment/$DEPLOYMENT -n taxicab | awk '{print \$2}' | grep -v DESIRED",
+              script: "kubectl get deployment/$DEPLOYMENT -n taxicab | awk '{print \$2}' | grep -v READY | awk -F'/' '{print \$1}'",
               returnStdout: true
               ).trim()
 
             CURRENT= sh (
-              script: "kubectl get deployment/$DEPLOYMENT -n taxicab | awk '{print \$3}' | grep -v CURRENT",
+              script: "kubectl get deployment/$DEPLOYMENT -n taxicab | awk '{print \$2}' | grep -v READY | awk -F'/' '{print \$2}'",
               returnStdout: true
               ).trim()
 
             if (DESIRED.equals(CURRENT)) {
               currentBuild.result = "SUCCESS"
+
             } else {
               error("Deployment Unsuccessful.")
               currentBuild.result = "FAILURE"
@@ -218,13 +209,21 @@ pipeline {
       } 
     }
 
-/*
+
     stage('Validate Prod Green Env') {
       steps {
-        if (userInput['PROD_BLUE_DEPLOYMENT'] == false) {
+
+        script {
+          if (userInput['PROD_BLUE_DEPLOYMENT'] == false) {
+
+            GREEN_SVC_NAME = "taxicab-prod-svc-${BUILD_NUMBER}" 
+
+            echo "Validated... ${GREEN_SVC_NAME}"
+          }  
+        }
+          /*
           //withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/prod-config"]){
-          GREEN_SVC_NAME = sh (
-            script: "yq .metadata.name k8s/service.yaml | tr -d '\"'",
+          GREEN_SVC_NAME = script: "yq .metadata.name k8s/service.yaml | tr -d '\"'",
             returnStdout: true
             ).trim()
 
@@ -234,6 +233,7 @@ pipeline {
             ).trim()
 
           echo "Green ENV LB: ${GREEN_LB}"
+
           RESPONSE = sh (
             script: "curl -s -o /dev/null -w \"%{http_code}\" http://admin:password@${GREEN_LB}/swagger-ui.html -I",
             returnStdout: true
@@ -245,36 +245,46 @@ pipeline {
             echo "Application didnot pass the test case. Not Working"
             currentBuild.result = "FAILURE"
           }
-        }
+          */
+
       }
     }
 
 
     stage('Patch Prod Blue Service') {
-      steps('master'){
-        if (userInput['PROD_BLUE_DEPLOYMENT'] == false) {
-        //withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/prod-config"]){
-          BLUE_VERSION = sh (
-            script: "kubectl get svc/${PROD_BLUE_SERVICE} -n taxicab -o yaml | yq .spec.selector.version",
-            returnStdout: true
-            ).trim()
-
-          CMD = "kubectl get deployment -n taxicab -l version=${BLUE_VERSION} | awk '{if(NR>1)print \$1}'"
+      steps {
+        script {
+          if (userInput['PROD_BLUE_DEPLOYMENT'] == false) {
           
-          BLUE_DEPLOYMENT_NAME = sh (
-            script: "${CMD}",
-            returnStdout: true
-            ).trim()
+            BLUE_VERSION = sh (
+              script: "kubectl get svc/${PROD_BLUE_SERVICE} -n taxicab -o jsonpath=\"{.spec.selector.version}\"",
+              returnStdout: true
+              ).trim()
 
-          echo "${BLUE_DEPLOYMENT_NAME}"
-          sh """kubectl patch svc  "${PROD_BLUE_SERVICE}" -n taxicab -p '{\"spec\":{\"selector\":{\"app\":\"taxicab\",\"version\":\"${BUILD_NUMBER}\"}}}'"""
-          echo "Deleting Blue Environment..."
-          sh "kubectl delete svc ${GREEN_SVC_NAME} -n taxicab"
-          sh "kubectl delete deployment ${BLUE_DEPLOYMENT_NAME} -n taxicab"
-        }
+            CMD = "kubectl get deployment -n taxicab -l version=${BLUE_VERSION} | awk '{if(NR>1)print \$1}'"
+          
+            BLUE_DEPLOYMENT_NAME = sh (
+              script: "${CMD}",
+              returnStdout: true
+              ).trim()
+
+            echo "${BLUE_DEPLOYMENT_NAME}"
+
+            sh """kubectl patch svc  "${PROD_BLUE_SERVICE}" -n taxicab -p '{\"spec\":{\"selector\":{\"app\":\"taxicab\",\"version\":\"${BUILD_NUMBER}\"}}}'"""
+
+            echo "Deleting Blue Environment..."
+            sh "kubectl delete svc ${GREEN_SVC_NAME} -n taxicab"
+            sh "kubectl delete deployment ${BLUE_DEPLOYMENT_NAME} -n taxicab"
+
+          } else {
+            echo "Create new ${PROD_BLUE_SERVICE}"
+            sh "sed -i 's|taxicab-prod-svc-${BUILD_NUMBER}|${PROD_BLUE_SERVICE}|g' k8s/service.yaml"
+            sh "kubectl apply -f k8s/service.yaml -n taxicab"
+          }
+        }  
       }
     }
 
-    */
+    
   }
 }
