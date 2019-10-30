@@ -11,8 +11,8 @@ def createNamespace (namespace) {
 
 pipeline {
 
+  // Build auto timeout
   options {
-    // Build auto timeout
     timeout(time: 60, unit: 'MINUTES')
   }
 
@@ -26,18 +26,6 @@ pipeline {
     PROD_BLUE_SERVICE = 'taxicab-prod-svc'
   }
 
-  /*
-  properties([
-	  parameters([
-      string (name: 'DOCKER_REG', defaultValue: 'harbor.pcfgcp.pkhamdee.com', description: 'Docker registry'),
-      string (name: 'IMAGE_NAME', defaultValue: 'java-app', description: 'image name'),
-      string (name: 'GIT_BRANCH', defaultValue: 'master', description: 'Which Git Branch to clone'),
-      string (name: 'KUBECONFIG', defaultValue: "$WORKSPACE/.kubeconfig", description: 'kubeconfig'),
-      string (name: 'PROD_BLUE_SERVICE', defaultValue: 'taxicab-prod-svc', description: 'Blue Service Name to patch in Prod Environment')
-	  ])
-  ])
-  */
-
   // In this example, all is built and run from the master
   agent { node { label 'master' } }
   
@@ -50,6 +38,7 @@ pipeline {
 
         cleanWs()
 
+        //get checkout
         echo "Check out TaxiCabApplication code"
                 git branch: "master",                        
                         url: 'https://github.com/pkhamdee/TaxiCabApplication.git'
@@ -70,10 +59,17 @@ pipeline {
 
         echo "DOCKER_REG is ${DOCKER_REG}"
 
+        //create namespace taxicab
         script {
-          namespace = 'taxicab'
+          namespace = 'taxicab-dev'
           createNamespace (namespace)   
         }
+
+        script {
+          namespace = 'taxicab-prod'
+          createNamespace (namespace)   
+        }
+
       }
     }
 
@@ -99,7 +95,8 @@ pipeline {
 
           echo "Git commit id: ${GIT_COMMIT_ID}"
 
-          IMAGETAG="${GIT_COMMIT_ID}-${TIMESTAMP}"
+          //IMAGETAG="${GIT_COMMIT_ID}-${TIMESTAMP}"
+          IMAGETAG="${GIT_COMMIT_ID}"
 
         } 
 
@@ -125,21 +122,21 @@ pipeline {
 
         script {
 
-          sh "kubectl apply -f k8s -n taxicab" 
+          sh "kubectl apply -f k8s -n taxicab-dev" 
 
           DEPLOYMENT = "taxicab-dev-${BUILD_NUMBER}"  
 
-          echo "Creating k8s resources..."
+          echo "Creating k8s ${DEPLOYMENT} resources..."
 
           sleep 10
 
           DESIRED= sh (
-            script: "kubectl get deployment/$DEPLOYMENT -n taxicab | awk '{print \$2}' | grep -v READY | awk -F'/' '{print \$1}'",
+            script: "kubectl get deployment/$DEPLOYMENT -n taxicab-dev | awk '{print \$2}' | grep -v READY | awk -F'/' '{print \$1}'",
             returnStdout: true
             ).trim()
 
           CURRENT= sh (
-            script: "kubectl get deployment/$DEPLOYMENT -n taxicab | awk '{print \$2}' | grep -v READY | awk -F'/' '{print \$2}'",
+            script: "kubectl get deployment/$DEPLOYMENT -n taxicab-dev | awk '{print \$2}' | grep -v READY | awk -F'/' '{print \$2}'",
             returnStdout: true
             ).trim()
 
@@ -154,6 +151,20 @@ pipeline {
         }
       }    
     }
+
+    stage('Dev tests') {
+      steps {
+        echo "Dev tests"
+
+      }
+    }
+
+    stage('Cleanup on Dev') {
+      steps {
+        echo "Cleanup Dev"
+        sh "kubectl delete -f k8s -n taxicab-dev"
+      }
+    }    
 
     stage('Go for Production?') {
       steps {
@@ -173,21 +184,21 @@ pipeline {
 
             sh "sed -i 's|dev|prod|g' k8s/*.yaml"
 
-            sh "kubectl apply -f k8s -n taxicab"
+            sh "kubectl apply -f k8s -n taxicab-prod"
 
             DEPLOYMENT = "taxicab-prod-${BUILD_NUMBER}"
 
-            echo "Creating k8s $DEPLOYMENT resources..."
+            echo "Creating k8s ${DEPLOYMENT} resources..."
 
             sleep 10
 
             DESIRED= sh (
-              script: "kubectl get deployment/$DEPLOYMENT -n taxicab | awk '{print \$2}' | grep -v READY | awk -F'/' '{print \$1}'",
+              script: "kubectl get deployment/$DEPLOYMENT -n taxicab-prod | awk '{print \$2}' | grep -v READY | awk -F'/' '{print \$1}'",
               returnStdout: true
               ).trim()
 
             CURRENT= sh (
-              script: "kubectl get deployment/$DEPLOYMENT -n taxicab | awk '{print \$2}' | grep -v READY | awk -F'/' '{print \$2}'",
+              script: "kubectl get deployment/$DEPLOYMENT -n taxicab-prod | awk '{print \$2}' | grep -v READY | awk -F'/' '{print \$2}'",
               returnStdout: true
               ).trim()
 
@@ -257,29 +268,30 @@ pipeline {
           if (userInput['PROD_BLUE_DEPLOYMENT'] == false) {
           
             BLUE_VERSION = sh (
-              script: "kubectl get svc/${PROD_BLUE_SERVICE} -n taxicab -o jsonpath=\"{.spec.selector.version}\"",
+              script: "kubectl get svc/${PROD_BLUE_SERVICE} -n taxicab-prod -o jsonpath=\"{.spec.selector.version}\"",
               returnStdout: true
               ).trim()
 
-            CMD = "kubectl get deployment -n taxicab -l version=${BLUE_VERSION} | awk '{if(NR>1)print \$1}'"
+            CMD = "kubectl get deployment -n taxicab-prod -l version=${BLUE_VERSION} | awk '{if(NR>1)print \$1}'"
           
             BLUE_DEPLOYMENT_NAME = sh (
               script: "${CMD}",
               returnStdout: true
               ).trim()
 
-            echo "${BLUE_DEPLOYMENT_NAME}"
+            BLUE_SVC_NAME = "taxicab-prod-svc-${BLUE_VERSION}"  
 
-            sh """kubectl patch svc  "${PROD_BLUE_SERVICE}" -n taxicab -p '{\"spec\":{\"selector\":{\"app\":\"taxicab\",\"version\":\"${BUILD_NUMBER}\"}}}'"""
+            sh """kubectl patch svc "${PROD_BLUE_SERVICE}" -n taxicab-prod -p '{\"spec\":{\"selector\":{\"app\":\"taxicab\",\"version\":\"${BUILD_NUMBER}\"}}}'"""
 
-            echo "Deleting Blue Environment..."
-            sh "kubectl delete svc ${GREEN_SVC_NAME} -n taxicab"
-            sh "kubectl delete deployment ${BLUE_DEPLOYMENT_NAME} -n taxicab"
+            echo "Deleting Blue Environment... service = ${BLUE_SVC_NAME}, deployment = ${BLUE_DEPLOYMENT_NAME}"
+            sh "kubectl delete svc ${BLUE_SVC_NAME} -n taxicab-prod"
+            sh "kubectl delete deployment ${BLUE_DEPLOYMENT_NAME} -n taxicab-prod"
 
           } else {
             echo "Create new ${PROD_BLUE_SERVICE}"
             sh "sed -i 's|taxicab-prod-svc-${BUILD_NUMBER}|${PROD_BLUE_SERVICE}|g' k8s/service.yaml"
-            sh "kubectl apply -f k8s/service.yaml -n taxicab"
+            sh "sed -i 's|taxicab-prod-${BUILD_NUMBER}|taxicab-prod|g' k8s/service.yaml"
+            sh "kubectl apply -f k8s/service.yaml -n taxicab-prod"
           }
         }  
       }

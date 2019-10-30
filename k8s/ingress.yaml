@@ -1,0 +1,12 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: taxicab-ENVIRONMENT-BUILD_NUMBER
+spec:
+  rules:
+  - host: taxicab-ENVIRONMENT-BUILD_NUMBER.dev1.pcfgcp.pkhamdee.com
+    http:
+      paths:
+      - backend:
+          serviceName: taxicab-ENVIRONMENT-svc-BUILD_NUMBER
+          servicePort: 80
