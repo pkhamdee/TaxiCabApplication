@@ -9,6 +9,24 @@ def createNamespace (namespace) {
     sh "[ ! -z \"\$(kubectl get ns ${namespace} -o name 2>/dev/null)\" ] || kubectl create ns ${namespace}"
 }
 
+/* Run a curl against a given url */
+def curlRun (url, out) {
+    echo "Running curl on ${url}"
+
+    script {
+        if (out.equals('')) {
+            out = 'http_code'
+        }
+        echo "Getting ${out}"
+                def result = sh (
+                returnStdout: true,
+                script: "curl --output /dev/null --silent --connect-timeout 5 --max-time 5 --retry 5 --retry-delay 5 --retry-max-time 30 --write-out \"%{${out}}\" ${url}"
+        )
+        echo "Result (${out}): ${result}"
+    }
+}
+
+
 pipeline {
 
   // Build auto timeout
@@ -74,12 +92,22 @@ pipeline {
     }
 
     stage('Build Maven'){
+      when {
+        allOf {
+          expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
+        }
+      }
       steps {
         sh "mvn clean package"
       }
     }
 
     stage('Build Docker Image') {
+      when {
+        allOf {
+          expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
+        }
+      }
       steps {
 
         script {
@@ -114,6 +142,11 @@ pipeline {
     }
 
     stage('Deploy on Dev') {
+      when {
+        allOf {
+          expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
+        }
+      }
       steps {
 
         sh "sed -i 's|IMAGE|${DOCKER_REG}/${DOCKER_PROJ}/${IMAGE_NAME}:${IMAGETAG}|g' k8s/deployment.yaml"
@@ -128,7 +161,7 @@ pipeline {
 
           echo "Creating k8s ${DEPLOYMENT} resources..."
 
-          sleep 10
+          sleep 180
 
           DESIRED= sh (
             script: "kubectl get deployment/$DEPLOYMENT -n taxicab-dev | awk '{print \$2}' | grep -v READY | awk -F'/' '{print \$1}'",
@@ -153,13 +186,52 @@ pipeline {
     }
 
     stage('Dev tests') {
+      when {
+        allOf {
+          expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
+        }
+      }
       steps {
         echo "Dev tests"
+
+        script {
+          DEV_ING_NAME = "taxicab-dev01-${BUILD_NUMBER}"
+
+          DEV_LB = sh (
+            script: "kubectl get ing ${DEV_ING_NAME} -n taxicab-dev | awk '{print \$2}' | grep -v HOSTS",
+            returnStdout: true
+            ).trim()
+
+          echo "Dev ENV LB: ${DEV_LB}"
+          
+          RESPONSE = sh (
+            returnStdout: true,
+            script: "curl --output /dev/null --silent --connect-timeout 5 --max-time 5 --retry 5 --retry-delay 5 --retry-max-time 30 --write-out \"%{http_code}\" http://admin:password@${DEV_LB}/swagger-ui.html"
+            )
+
+          echo "RESPONSE : ${RESPONSE}"  
+
+          if (RESPONSE == "200") {
+            echo "Application is working fine. Proceeding to patch the service to point to the latest deployment..."
+
+          } else {
+
+            echo "Application didnot pass the test case. Not Working"
+            currentBuild.result = "FAILURE"
+            return
+          }
+
+        }
 
       }
     }
 
     stage('Cleanup on Dev') {
+      when {
+        allOf {
+          expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
+        }
+      }
       steps {
         echo "Cleanup Dev"
         sh "kubectl delete -f k8s -n taxicab-dev"
@@ -167,6 +239,11 @@ pipeline {
     }    
 
     stage('Go for Production?') {
+      when {
+        allOf {
+          expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
+        }
+      }
       steps {
         script {
             userInput = input message: 'Proceed to Production?', 
@@ -177,6 +254,11 @@ pipeline {
     }
 
     stage('Deploy on Prod') {
+      when {
+        allOf {
+          expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
+        }
+      }
       steps {
         script {
           if (userInput['DEPLOY_TO_PROD'] == true) {
@@ -190,7 +272,7 @@ pipeline {
 
             echo "Creating k8s ${DEPLOYMENT} resources..."
 
-            sleep 10
+            sleep 180
 
             DESIRED= sh (
               script: "kubectl get deployment/$DEPLOYMENT -n taxicab-prod | awk '{print \$2}' | grep -v READY | awk -F'/' '{print \$1}'",
@@ -222,47 +304,56 @@ pipeline {
 
 
     stage('Validate Prod Green Env') {
+      when {
+        allOf {
+          expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
+        }
+      }
       steps {
 
         script {
           if (userInput['PROD_BLUE_DEPLOYMENT'] == false) {
 
-            GREEN_SVC_NAME = "taxicab-prod-svc-${BUILD_NUMBER}" 
+            GREEN_ING_NAME = "taxicab-prod-${BUILD_NUMBER}"
 
-            echo "Validated... ${GREEN_SVC_NAME}"
+            GREEN_LB = sh (
+              script: "kubectl get ing ${GREEN_ING_NAME} -n taxicab-prod | awk '{print \$2}' | grep -v HOSTS",
+              returnStdout: true
+              ).trim()
+
+            echo "Green ENV LB: ${GREEN_LB}"
+
+            RESPONSE = sh (
+              script: "curl --output /dev/null --silent --connect-timeout 5 --max-time 5 --retry 5 --retry-delay 5 --retry-max-time 30 --write-out \"%{http_code}\" http://admin:password@${GREEN_LB}/swagger-ui.html",
+              returnStdout: true
+              )
+
+            if (RESPONSE == "200") {
+              echo "Application is working fine. Proceeding to patch the service to point to the latest deployment..."
+
+            } else {
+              
+              //rollback
+              sh "kubectl delete -f k8s -n taxicab-prod"   
+
+              echo "Application didnot pass the test case. Not Working"
+              currentBuild.result = "FAILURE"
+              return
+            }
+ 
+
           }  
         }
-          /*
-          //withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/prod-config"]){
-          GREEN_SVC_NAME = script: "yq .metadata.name k8s/service.yaml | tr -d '\"'",
-            returnStdout: true
-            ).trim()
-
-          GREEN_LB = sh (
-            script: "kubectl get svc ${GREEN_SVC_NAME} -n taxicab -o jsonpath=\"{.status.loadBalancer.ingress[*].hostname}\"",
-            returnStdout: true
-            ).trim()
-
-          echo "Green ENV LB: ${GREEN_LB}"
-
-          RESPONSE = sh (
-            script: "curl -s -o /dev/null -w \"%{http_code}\" http://admin:password@${GREEN_LB}/swagger-ui.html -I",
-            returnStdout: true
-          ).trim()
-
-          if (RESPONSE == "200") {
-            echo "Application is working fine. Proceeding to patch the service to point to the latest deployment..."
-          } else {
-            echo "Application didnot pass the test case. Not Working"
-            currentBuild.result = "FAILURE"
-          }
-          */
-
       }
     }
 
 
     stage('Patch Prod Blue Service') {
+      when {
+        allOf {
+          expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
+        }
+      }
       steps {
         script {
           if (userInput['PROD_BLUE_DEPLOYMENT'] == false) {
@@ -300,7 +391,5 @@ pipeline {
         }  
       }
     }
-
-    
   }
 }
