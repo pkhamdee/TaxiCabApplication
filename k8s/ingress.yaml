@@ -4,7 +4,7 @@ metadata:
   name: taxicab-ENVIRONMENT-BUILD_NUMBER
 spec:
   rules:
-  - host: taxicab-ENVIRONMENT-BUILD_NUMBER.dev1.pcfgcp.pkhamdee.com
+  - host: taxicab-ENVIRONMENT-BUILD_NUMBER.dev1.pkspoc.pldtglobal.com
     http:
       paths:
       - backend:
